@@ -14,6 +14,7 @@ def line_plotter(x, y, xlabel='X-axis', ylabel='Y-axis', title='Line Plot', lege
     grid (bool): Whether to show grid lines. Default is True.
     save_path (str): Path to save the plot image. Default is None (does not save).
     """
+    plt.ion()
     fig, ax = plt.subplots()
     ax.plot(x, y, label=legend, color='blue')
 

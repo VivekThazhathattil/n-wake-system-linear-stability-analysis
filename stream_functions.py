@@ -26,6 +26,7 @@ class StreamFunctions:
         self.rho_wake = sp.symbols('rho_wake') # wake region density
         self.Lambda = sp.symbols('Lambda') # shear ratio
         self.S = sp.symbols('S') # density ratio
+        self.w = sp.symbols('w') # omega, our complex frequency
 
         # Create the piecewise regions for which stream functions will be defined
         self.create_region_ids()
