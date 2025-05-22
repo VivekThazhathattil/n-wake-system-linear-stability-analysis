@@ -2,16 +2,6 @@ import sympy as sp
 import numpy as np
 
 def newton_raphson_2eq(f1, f2, vars, init_vals, tol=1e-8, max_iter=250):
-    """
-    Solves a system of two nonlinear equations using Newton-Raphson method.
-    
-    Parameters:
-        f1, f2: SymPy expressions representing the equations.
-        vars: Tuple of SymPy symbols (k, w) for the unknowns.
-        init_vals: Initial guesses as a tuple (k0, w0).
-        tol: Tolerance for convergence.
-        max_iter: Maximum iterations.
-    """
     alpha, w = vars
     # Build our Jacobian matrix
     J = sp.Matrix([[sp.diff(f1, alpha), sp.diff(f1, w)],

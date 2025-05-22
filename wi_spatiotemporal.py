@@ -1,0 +1,160 @@
+# In this version, I'm using newton iteration to get an initial guess for (k,w)
+import sympy as sp
+import numpy as np
+from single_equation_newton_iteration import *
+
+# involves x_{n+1} = x_{n} - J^{-1}f_{n}
+def newton_two_equation_solver(f1_eq, f2_eq, alpha_symbol, w_symbol, 
+                               alpha_guess, w_guess, max_iterations=50, 
+                               tolerance=1e-8, verbose=False):
+    # create a pythonic function to evaluate dispersion relation for a given wavenumber and frequency
+    f1 = sp.lambdify((alpha_symbol, w_symbol), f1_eq.lhs - f1_eq.rhs, 'numpy')
+    # create a similar pythonic function for evaluating dD/dk
+    f2 = sp.lambdify((alpha_symbol, w_symbol), f2_eq.lhs - f2_eq.rhs, 'numpy')
+
+    # obtain the components of the jacobian matrix
+    df1_dalpha = sp.diff(f1_eq.lhs - f1_eq.rhs, alpha_symbol)
+    df1_dw = sp.diff(f1_eq.lhs - f1_eq.rhs, w_symbol)
+    df2_dalpha = sp.diff(f2_eq.lhs - f2_eq.rhs, alpha_symbol)
+    df2_dw = sp.diff(f2_eq.lhs - f2_eq.rhs, w_symbol)
+    
+    # components of the jacobian matrix in functional form
+    J11 = sp.lambdify((alpha_symbol, w_symbol), df1_dalpha, 'numpy')
+    J12 = sp.lambdify((alpha_symbol, w_symbol), df1_dw, 'numpy')
+    J21 = sp.lambdify((alpha_symbol, w_symbol), df2_dalpha, 'numpy')
+    J22 = sp.lambdify((alpha_symbol, w_symbol), df2_dw, 'numpy')
+
+    # alpha and w are set to given initial values
+    alpha = complex(alpha_guess)
+    w = complex(w_guess)
+    
+    # begin 2-eq newton iteration
+    for i in range(max_iterations):
+        # evaluate the current values of the set of functions [f1, f2]
+        f1_val = f1(alpha, w)
+        f2_val = f2(alpha, w)
+        
+        # convergence criterion
+        if abs(f1_val) < tolerance and abs(f2_val) < tolerance:
+            if verbose:
+                print(f"Converged after {i} iterations")
+            # return from the function if converged
+            return alpha, w, True, i
+        
+        try:
+            # create the jacobian matrix after substituting current alpha, w values
+            J = np.array([
+                [J11(alpha, w), J12(alpha, w)],
+                [J21(alpha, w), J22(alpha, w)]
+            ], dtype=complex)
+            
+            # create the function vector
+            f_vals = np.array([f1_val, f2_val], dtype=complex)
+            
+            # check if Jacobian is singular
+            det_J = J[0,0]*J[1,1] - J[0,1]*J[1,0]
+            if abs(det_J) < 1e-10:
+                if verbose:
+                    print(f"Jacobian nearly singular at iteration {i}, det(J)={det_J}")
+                break
+                
+            # evaluate the 2nd term on RHS in 2eq-newton iteration: x_{n+1} = x_{n} - J^{-1}f_{n}
+            # This solves for Jy = f, which gives y = J^{-1}f, which is what we need
+            delta = np.linalg.solve(J, f_vals)
+            
+            # obtain x_{n+1}, where x_{n+1} = [alpha_{n+1}, w_{n+1}]
+            alpha_new = alpha - delta[0]
+            w_new = w - delta[1]
+
+            # criterion for diverging solution; exit if this happens
+            if (abs(alpha_new) > 1e5 or abs(w_new) > 1e5 or 
+                np.isnan(alpha_new) or np.isnan(w_new)):
+                if verbose:
+                    print(f"Diverged at iteration {i}")
+                break
+                
+            # update the iteration by setting x_{n+1} as the current [alpha, w]
+            alpha, w = alpha_new, w_new
+            
+            # print more details about current iteration [DEBUG function]
+            if verbose:
+                print(f"Iteration {i}: alpha={alpha}, w={w}, |f1|={abs(f1_val)}, |f2|={abs(f2_val)}")
+                
+        # handle exceptions, if any
+        except Exception as e:
+            if verbose:
+                print(f"Error at iteration {i}: {str(e)}")
+            break
+    
+    # report back to the user if the solution convergence failed
+    if verbose:
+        print(f"Did not converge after {max_iterations} iterations")
+    return alpha, w, False, max_iterations
+
+def find_all_saddle_points(f1_eq, f2_eq, sf, val_set):
+    unique_solutions = []
+
+    c_symbol = sf.c
+    w_symbol = sf.w
+    alpha_symbol = sf.alpha
+
+    # instead of a grid search, we use the maximum of 
+    # temporal stability analysis as the initial guess
+    alpha_vals = np.linspace(-5,5,50)
+    wi_vals = []
+    f1_eq_diff = sp.diff(f1_eq.lhs, c_symbol)
+    f1_eq_sub = f1_eq.subs(val_set)
+    f1_eq_diff_sub = f1_eq_diff.subs(val_set)
+    f1 = sp.lambdify((alpha_symbol, c_symbol), f1_eq_sub.lhs - f1_eq_sub.rhs, 'numpy')
+    df1 = sp.lambdify((alpha_symbol, c_symbol), f1_eq_diff_sub, 'numpy')
+
+    #print('DEBUG 1')
+    #print(f1_eq)
+    #print('DEBUG 2')
+    #print(f1_eq_sub)
+    #print('DEBUG 3')
+    #print(f1_eq_diff)
+    #print('DEBUG 4')
+    #print(f1_eq_diff_sub)
+
+    c_guess = 1 + (1j * 1)
+
+    for alpha_val in alpha_vals:
+        c_temp = newton_iteration(f1, df1, c_guess, alpha_val, max_iter=100, tolerance=1e-6)
+        wi_vals.append(np.max(np.imag(c_temp * alpha_val)))
+
+    #print(wi_vals)
+
+    w_chosen = np.max(wi_vals) * 1j
+    alpha_chosen_idx = np.argmax(wi_vals)
+    #alpha_chosen = alpha_vals[alpha_chosen_idx] + (1j * 1.25)
+    #alpha_chosen = alpha_vals[alpha_chosen_idx]
+    #alpha_chosen = alpha_vals[alpha_chosen_idx] + (1j * 2.5)
+    #alpha_chosen = alpha_vals[alpha_chosen_idx] + (1j * 5.0)
+
+    # varicose
+    alpha_chosen = 2.5 + 5j 
+    w_chosen = 4j
+
+    #sinuous
+
+    f1_eq = f1_eq.subs({'c': sf.w/sf.alpha})
+    f2_eq = f2_eq.subs({'c': sf.w/sf.alpha})
+    alpha, w, converged, _ = newton_two_equation_solver(
+        f1_eq, f2_eq, alpha_symbol, w_symbol, 
+        alpha_chosen, w_chosen, verbose=False
+    )
+
+    if converged:
+        unique_solutions.append((alpha, w))
+    else:
+        print(f"Solution didnt converge for (alpha, w) = ({alpha_chosen},{w_chosen})")
+        unique_solutions.append((alpha_chosen, w_chosen))
+
+    return unique_solutions
+
+def find_and_display_solutions(f1_eq, f2_eq, sf, val_set):
+    solutions = find_all_saddle_points(
+        f1_eq, f2_eq, sf, val_set
+    )
+    return solutions

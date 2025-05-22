@@ -41,4 +41,4 @@ class TemporalStability:
         B_num = np.array(self.B_temp.evalf()).astype(np.complex128)
 
         c_vals, eig_vecs = eig(A_num, B_num)
-        return c_vals
+        return c_vals, eig_vecs
