@@ -217,6 +217,19 @@ class SIVP:
         b2 = np.append(b2_11, b2_22)
         return b2
 
+    def get_straight_path_k0j(self, k0j1, k0j2, step=0.1):
+        path = [k0j1]
+        total_dist = np.abs(k0j2 - k0j1)
+        if total_dist == 0:
+            return path
+        num_steps = int(np.ceil(total_dist / step))
+        for i in range(1, num_steps):
+            frac = i / num_steps
+            next_point = k0j1 + frac * (k0j2 - k0j1)
+            path.append(next_point)
+        path.append(k0j2)
+        return path
+
     def get_zigzag_path_k0j(self, k0j1, k0j2, step=0.1):
         path = [k0j1]
         current = k0j1
@@ -254,15 +267,15 @@ class SIVP:
         # print path as (.,.) -> (.,.) -> etc in a single line
         path_str = ''
         for i in range(len(path) - 1):
-            path_str += f'({path[i][0]:.2f},{path[i][1]:.2f}) -> '
-        path_str += f'({path[-1][0]:.2f},{path[-1][1]:.2f})'
+            path_str += f'({np.real(path[i]):.2f},{np.imag(path[i]):.2f}) -> '
+        path_str += f'({np.real(path[-1]):.2f},{np.imag(path[-1]):.2f})'
         print(path_str)
 
     def get_x_multi_SIVP(self, k0j1, k0j2, w, qhat):
         if np.abs(k0j1 - k0j2) < 1e-8:
             return w, qhat
         #Get the path to traverse from k0j1 to k0j2 using SIVP
-        k0js = self.get_zigzag_path_k0j(k0j1, k0j2)
+        k0js = self.get_straight_path_k0j(k0j1, k0j2)
         self.pretty_print_path(k0js)
 
         # traverse the path and find the w and qhat at each step
